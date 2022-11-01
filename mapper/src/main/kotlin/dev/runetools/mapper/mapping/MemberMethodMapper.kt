@@ -29,10 +29,9 @@ class MemberMethodMapper {
         mappings.keySet().forEach { from ->
             val toSet = mappings.get(from)
             val mapping = MethodClassifier.rank(from, toSet) ?: return@forEach
-            ConsoleProgressBar.stepBy(toSet.size)
             val nodeMappings = NodeMappings()
             nodeMappings.map(mapping.from, mapping.to).also {
-                it.weight = mapping.weight
+                it.score = mapping.weight
             }
             toMerge.add(nodeMappings)
         }

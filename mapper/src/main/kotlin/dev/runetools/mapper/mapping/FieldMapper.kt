@@ -3,27 +3,31 @@ package dev.runetools.mapper.mapping
 import com.google.common.collect.LinkedHashMultimap
 import dev.runetools.asm.tree.ClassPool
 import dev.runetools.asm.util.ConsoleProgressBar
-import dev.runetools.mapper.classifier.ClassClassifier
 import dev.runetools.mapper.classifier.ClassifierUtil
-import org.objectweb.asm.tree.ClassNode
+import dev.runetools.mapper.classifier.FieldClassifier
+import org.objectweb.asm.tree.FieldNode
 
-class ClassMapper {
+class FieldMapper {
 
-    private val mappings = LinkedHashMultimap.create<ClassNode, ClassNode>()
+    private val mappings = LinkedHashMultimap.create<FieldNode, FieldNode>()
 
-    private fun ClassPool.filterPotentialMatches(cls: ClassNode) = classes.filter { ClassifierUtil.isMaybeEqual(it, cls) }.toSet()
+    private fun ClassPool.fields() = classes.flatMap { it.fields }.toSet()
+
+    private fun ClassPool.filterPotentialMatches(field: FieldNode) = classes.flatMap { it.fields }
+        .filter { ClassifierUtil.isMaybeEqual(it, field) }
+        .toSet()
 
     fun map(fromPool: ClassPool, toPool: ClassPool): NodeMappings {
-        fromPool.classes.forEach { from ->
+        fromPool.fields().forEach { from ->
             mappings.putAll(from, toPool.filterPotentialMatches(from))
         }
 
         val toMerge = mutableListOf<NodeMappings>()
 
-        ConsoleProgressBar.enable("Classes", mappings.values().size)
+        ConsoleProgressBar.enable("Fields", mappings.values().size)
         mappings.keySet().forEach { from ->
             val toSet = mappings.get(from)
-            val mapping = ClassClassifier.rank(from, toSet) ?: return@forEach
+            val mapping = FieldClassifier.rank(from, toSet) ?: return@forEach
             val nodeMappings = NodeMappings()
             nodeMappings.map(mapping.from, mapping.to).also {
                 it.score = mapping.weight

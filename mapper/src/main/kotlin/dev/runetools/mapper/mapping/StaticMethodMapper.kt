@@ -31,10 +31,9 @@ class StaticMethodMapper {
         mappings.keySet().forEach { from ->
             val toSet = mappings.get(from)
             val mapping = StaticMethodClassifier.rank(from, toSet) ?: return@forEach
-            ConsoleProgressBar.stepBy(toSet.size)
             val nodeMappings = NodeMappings()
             nodeMappings.map(mapping.from, mapping.to).also {
-                it.weight = mapping.weight
+                it.score = mapping.weight
             }
             toMerge.add(nodeMappings)
         }

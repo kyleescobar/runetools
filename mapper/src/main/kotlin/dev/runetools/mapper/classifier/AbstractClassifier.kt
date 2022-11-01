@@ -30,6 +30,7 @@ abstract class AbstractClassifier<T> {
         var multiple = false
 
         toSet.parallelStream().forEach { to ->
+            ConsoleProgressBar.step()
             val mapping = Mapping(from as Any, to as Any)
             var weight = 0.0
             classifiers.forEach { classifier ->
