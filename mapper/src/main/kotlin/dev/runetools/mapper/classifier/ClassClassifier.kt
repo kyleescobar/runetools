@@ -1,10 +1,14 @@
 package dev.runetools.mapper.classifier
 
 import dev.runetools.asm.tree.*
+import dev.runetools.mapper.classifier.ClassifierUtil.isObfuscatedName
+import org.jgrapht.alg.matching.DenseEdmondsMaximumCardinalityMatching
+import org.jgrapht.alg.matching.GreedyWeightedMatching
 import org.jgrapht.alg.matching.MaximumWeightBipartiteMatching
 import org.jgrapht.graph.DefaultWeightedEdge
 import org.jgrapht.graph.SimpleWeightedGraph
 import org.objectweb.asm.Opcodes.*
+import org.objectweb.asm.Type
 import org.objectweb.asm.tree.ClassNode
 import org.objectweb.asm.tree.FieldNode
 import org.objectweb.asm.tree.MethodNode
@@ -13,24 +17,27 @@ object ClassClassifier : AbstractClassifier<ClassNode>() {
 
     override fun init() {
         addClassifier(classTypeCheck, 20)
+        addClassifier(className, 10)
         addClassifier(signature, 5)
-        addClassifier(parentClass, 4)
-        addClassifier(children, 3)
-        addClassifier(interfaces, 3)
-        addClassifier(implementers, 2)
-        addClassifier(hierarchyDepth, 4)
+        addClassifier(superName, 5)
+        addClassifier(interfaces, 5)
+        addClassifier(parentClass, 8)
+        addClassifier(children, 8)
+        addClassifier(interfaceClasses, 8)
+        addClassifier(implementers, 8)
+        addClassifier(hierarchyDepth, 5)
         addClassifier(methodCount, 3)
         addClassifier(fieldCount, 3)
         addClassifier(strings, 8)
         addClassifier(numbers, 6)
-        addClassifier(methodTypeRefs, 8)
-        addClassifier(fieldTypeRefs, 8)
-        addClassifier(inRefs, 6)
-        addClassifier(outRefs, 6)
-        addClassifier(methodInRefs, 6)
-        addClassifier(methodOutRefs, 5)
-        addClassifier(fieldReadRefs, 5)
-        addClassifier(fieldWriteRefs, 5)
+        addClassifier(methodTypeRefs, 5)
+        addClassifier(fieldTypeRefs, 5)
+        addClassifier(inRefs, 4)
+        addClassifier(outRefs, 4)
+        addClassifier(methodInRefs, 4)
+        addClassifier(methodOutRefs, 4)
+        addClassifier(fieldReadRefs, 4)
+        addClassifier(fieldWriteRefs, 4)
     }
 
     private val classTypeCheck = classifier { a, b ->
@@ -56,12 +63,24 @@ object ClassClassifier : AbstractClassifier<ClassNode>() {
         return@classifier ClassifierUtil.compareClassSets(a.children, b.children)
     }
 
-    private val interfaces = classifier { a, b ->
+    private val interfaceClasses = classifier { a, b ->
         return@classifier ClassifierUtil.compareClassSets(a.interfaceClasses, b.interfaceClasses)
     }
 
     private val implementers = classifier { a, b ->
         return@classifier ClassifierUtil.compareClassSets(a.implementers, b.implementers)
+    }
+
+    private val interfaces = classifier { a, b ->
+        val interfsA = a.interfaces.map { Type.getObjectType(it) }.toSet()
+        val interfsB = b.interfaces.map { Type.getObjectType(it) }.toSet()
+        return@classifier ClassifierUtil.compareSets(interfsA, interfsB)
+    }
+
+    private val superName = classifier { a, b ->
+        val typeA = Type.getObjectType(a.superName)
+        val typeB = Type.getObjectType(b.superName)
+        return@classifier if(ClassifierUtil.isMaybeEqual(typeA, typeB)) 1.0 else 0.0
     }
 
     private val hierarchyDepth = classifier { a, b ->
@@ -84,11 +103,11 @@ object ClassClassifier : AbstractClassifier<ClassNode>() {
     }
 
     private val methodCount = classifier { a, b ->
-        return@classifier ClassifierUtil.compareCounts(a.methods.filter { !it.isStatic() }.size, b.methods.filter { !it.isStatic() }.size)
+        return@classifier ClassifierUtil.compareCounts(a.methods.size, b.methods.size)
     }
 
     private val fieldCount = classifier { a, b ->
-        return@classifier ClassifierUtil.compareCounts(a.fields.filter { !it.isStatic() }.size, b.fields.filter { !it.isStatic() }.size)
+        return@classifier ClassifierUtil.compareCounts(a.fields.size, b.fields.size)
     }
 
     private val methodTypeRefs = classifier { a, b ->
@@ -120,8 +139,8 @@ object ClassClassifier : AbstractClassifier<ClassNode>() {
 
     private fun ClassNode.getOutRefs(): Set<ClassNode> {
         val ret = hashSetOf<ClassNode>()
-        methods.filter { !it.isStatic() }.forEach { ret.addAll(it.classRefs) }
-        fields.filter { !it.isStatic() }.forEach { pool.findClass(it.type.internalName)?.apply { ret.add(this) } }
+        methods.forEach { ret.addAll(it.classRefs) }
+        fields.forEach { pool.findClass(it.type.internalName)?.apply { ret.add(this) } }
         return ret
     }
 
@@ -133,7 +152,7 @@ object ClassClassifier : AbstractClassifier<ClassNode>() {
 
     private fun ClassNode.getMethodOutRefs(): Set<MethodNode> {
         val ret = hashSetOf<MethodNode>()
-        methods.filter { !it.isStatic() }.forEach { ret.addAll(it.refsOut) }
+        methods.forEach { ret.addAll(it.refsOut) }
         return ret
     }
 
@@ -145,7 +164,7 @@ object ClassClassifier : AbstractClassifier<ClassNode>() {
 
     private fun ClassNode.getMethodInRefs(): Set<MethodNode> {
         val ret = hashSetOf<MethodNode>()
-        methods.filter { !it.isStatic() }.forEach { ret.addAll(it.refsIn) }
+        methods.forEach { ret.addAll(it.refsIn) }
         return ret
     }
 
@@ -157,7 +176,7 @@ object ClassClassifier : AbstractClassifier<ClassNode>() {
 
     private fun ClassNode.getFieldReadRefs(): Set<FieldNode> {
         val ret = hashSetOf<FieldNode>()
-        methods.filter { !it.isStatic() }.forEach { ret.addAll(it.fieldReadRefs) }
+        methods.forEach { ret.addAll(it.fieldReadRefs) }
         return ret
     }
 
@@ -169,23 +188,31 @@ object ClassClassifier : AbstractClassifier<ClassNode>() {
 
     private fun ClassNode.getFieldWriteRefs(): Set<FieldNode> {
         val ret = hashSetOf<FieldNode>()
-        methods.filter { !it.isStatic() }.forEach { ret.addAll(it.fieldWriteRefs) }
+        methods.forEach { ret.addAll(it.fieldWriteRefs) }
         return ret
     }
 
     private val strings = classifier { a, b ->
-        val stringsA = a.methods.filter { !it.isStatic() }.flatMap { it.strings }.toSet()
-        val stringsB = b.methods.filter { !it.isStatic() }.flatMap { it.strings }.toSet()
+        val stringsA = a.methods.flatMap { it.strings }.toSet()
+        val stringsB = b.methods.flatMap { it.strings }.toSet()
         return@classifier ClassifierUtil.compareSets(stringsA, stringsB)
     }
 
     private val numbers = classifier { a, b ->
-        val numbersA = a.methods.filter { !it.isStatic() }.flatMap { it.numbers }.toSet()
-        val numbersB = b.methods.filter { !it.isStatic() }.flatMap { it.numbers }.toSet()
+        val numbersA = a.methods.flatMap { it.numbers }.toSet()
+        val numbersB = b.methods.flatMap { it.numbers }.toSet()
         return@classifier ClassifierUtil.compareSets(numbersA, numbersB)
     }
 
+    private val className = classifier { a, b ->
+        if(!a.name.isObfuscatedName() && !b.name.isObfuscatedName()) {
+            return@classifier if(a.name == b.name) 1.0 else 0.0
+        }
+        return@classifier 0.0
+    }
+
     override fun rank(
+        level: ClassifierLevel,
         fromSet: Set<ClassNode>,
         toSet: Set<ClassNode>,
         filter: (from: ClassNode, to: ClassNode) -> Boolean
@@ -209,7 +236,7 @@ object ClassClassifier : AbstractClassifier<ClassNode>() {
         fromNodes.forEach { from ->
             toNodes.forEach { to ->
                 var score = 0.0
-                classifiers.forEach { classifier ->
+                classifiers[level]!!.forEach { classifier ->
                     score += (classifier.calculateScore(from, to) * classifier.weight)
                 }
 
@@ -220,15 +247,11 @@ object ClassClassifier : AbstractClassifier<ClassNode>() {
         }
 
         val matching = MaximumWeightBipartiteMatching(graph, fromNodes, toNodes).matching
-        return matching.edges.mapNotNull {
-            if(matching.isMatched(graph.getEdgeSource(it))) {
-                val from = graph.getEdgeSource(it)
-                val to = graph.getEdgeTarget(it)
-                val weight = graph.getEdgeWeight(it)
-                return@mapNotNull MatchResult(from, to, weight)
-            } else {
-                return@mapNotNull null
-            }
+        return matching.edges.mapNotNull { edge ->
+            val from = graph.getEdgeSource(edge)
+            val to = graph.getEdgeTarget(edge)
+            val weight = graph.getEdgeWeight(edge)
+            return@mapNotNull MatchResult<ClassNode>(from, to, weight)
         }
     }
 }

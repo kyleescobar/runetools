@@ -4,11 +4,13 @@ import dev.runetools.asm.tree.*
 import dev.runetools.mapper.asm.hasMatch
 import dev.runetools.mapper.asm.match
 import dev.runetools.mapper.classifier.ClassClassifier
+import dev.runetools.mapper.classifier.ClassifierLevel
 import dev.runetools.mapper.classifier.ClassifierUtil
 import dev.runetools.mapper.classifier.StaticMethodClassifier
 import org.tinylog.kotlin.Logger
 import java.io.File
 import java.io.FileNotFoundException
+import kotlin.math.sqrt
 
 object Mapper {
 
@@ -71,28 +73,31 @@ object Mapper {
     private fun run() {
         Logger.info("Starting mapper.")
 
-        autoMatchAll()
+        autoMatchAll(ClassifierLevel.INITIAL)
+        autoMatchAll(ClassifierLevel.SECONDARY)
 
         val staticMethodMatches = fromPool.classes.flatMap { it.methods }.filter { it.hasMatch() }.associate { it.id to it.match!!.id }
         val classMatches = fromPool.classes.filter { it.hasMatch() }.associate { it.id to it.match!!.id }
         println()
     }
 
-    private fun autoMatchAll() {
+    private fun autoMatchAll(level: ClassifierLevel) {
+        Logger.info("Matching level: ${level.name}.")
+
         var matchedAny: Boolean
         do {
-            matchedAny = autoMatchStaticMethods()
-            matchedAny = matchedAny or autoMatchClasses()
+            matchedAny = autoMatchStaticMethods(level)
+            matchedAny = matchedAny or autoMatchClasses(level)
         } while(matchedAny)
     }
 
-    private fun autoMatchClasses(): Boolean {
+    private fun autoMatchClasses(level: ClassifierLevel): Boolean {
         Logger.info("Matching classes.")
 
         val fromSet = fromPool.classes.filter { !it.hasMatch() }.toSet()
         val toSet = toPool.classes.filter { !it.hasMatch() }.toSet()
 
-        val matches = ClassClassifier.rank(fromSet, toSet, ClassifierUtil::isMaybeEqual)
+        val matches = ClassClassifier.rank(level, fromSet, toSet, ClassifierUtil::isMaybeEqual)
         var matched = 0
 
         matches.forEach { match ->
@@ -107,7 +112,7 @@ object Mapper {
         return matched > 0
     }
 
-    private fun autoMatchStaticMethods(): Boolean {
+    private fun autoMatchStaticMethods(level: ClassifierLevel): Boolean {
         Logger.info("Matching static methods.")
 
         val fromSet = fromPool.classes.flatMap { it.methods }
@@ -118,13 +123,11 @@ object Mapper {
             .filter { it.isStatic() && !it.hasMatch() }
             .toSet()
 
-        val matches = StaticMethodClassifier.rank(fromSet, toSet, ClassifierUtil::isMaybeEqual)
+        val matches = StaticMethodClassifier.rank(level, fromSet, toSet, ClassifierUtil::isMaybeEqual)
         var matched = 0
         matches.forEach { match ->
-            if(match.from.match != match.to) {
-                match.from.match(match.to)
-                matched++
-            }
+            match.from.match(match.to)
+            matched++
         }
 
         Logger.info("Matched $matched static methods.")
@@ -133,5 +136,9 @@ object Mapper {
 
     private fun save() {
 
+    }
+
+    private fun getRawScore(score: Double, maxScore: Double): Double {
+        return sqrt(score) * maxScore
     }
 }

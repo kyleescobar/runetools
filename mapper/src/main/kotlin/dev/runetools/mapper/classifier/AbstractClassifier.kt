@@ -1,16 +1,20 @@
 package dev.runetools.mapper.classifier
 
 import dev.runetools.asm.util.linkedListOf
+import java.util.LinkedList
 
 abstract class AbstractClassifier<T> {
 
-    val classifiers = linkedListOf<Classifier<T>>()
+    val classifiers = hashMapOf<ClassifierLevel, LinkedList<Classifier<T>>>()
+    val maxScore = hashMapOf<ClassifierLevel, Double>()
 
     abstract fun init()
 
-    fun addClassifier(classifier: Classifier<T>, weight: Int) {
+    fun addClassifier(classifier: Classifier<T>, weight: Int, vararg levels: ClassifierLevel = arrayOf(ClassifierLevel.INITIAL)) {
         classifier.weight = weight.toDouble()
-        classifiers.add(classifier)
+        levels.forEach { level ->
+            classifiers.computeIfAbsent(level) { linkedListOf() }.add(classifier)
+        }
     }
 
     fun classifier(block: (a: T, b: T) -> Double): Classifier<T> {
@@ -23,5 +27,5 @@ abstract class AbstractClassifier<T> {
         }
     }
 
-    abstract fun rank(fromSet: Set<T>, toSet: Set<T>, filter: (from: T, to: T) -> Boolean): List<MatchResult<T>>
+    abstract fun rank(level: ClassifierLevel, fromSet: Set<T>, toSet: Set<T>, filter: (from: T, to: T) -> Boolean): List<MatchResult<T>>
 }

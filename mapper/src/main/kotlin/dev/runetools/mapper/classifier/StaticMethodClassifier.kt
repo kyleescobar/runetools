@@ -29,7 +29,7 @@ object StaticMethodClassifier : AbstractClassifier<MethodNode>() {
         addClassifier(fieldReadRefs, 5)
         addClassifier(fieldWriteRefs, 5)
         addClassifier(lineNumberRange, 8)
-        //addClassifier(code, 12)
+        addClassifier(code, 12, ClassifierLevel.SECONDARY)
     }
 
     private val methodTypeCheck = classifier { a, b ->
@@ -110,6 +110,7 @@ object StaticMethodClassifier : AbstractClassifier<MethodNode>() {
     }
 
     override fun rank(
+        level: ClassifierLevel,
         fromSet: Set<MethodNode>,
         toSet: Set<MethodNode>,
         filter: (from: MethodNode, to: MethodNode) -> Boolean
@@ -140,7 +141,7 @@ object StaticMethodClassifier : AbstractClassifier<MethodNode>() {
             toNodes.forEach { to ->
                 if(ClassifierUtil.isMaybeEqual(from, to)) {
                     var score = 0.0
-                    classifiers.forEach { classifier ->
+                    classifiers[level]!!.forEach { classifier ->
                         score += (classifier.calculateScore(from, to) * classifier.weight)
                     }
                     graph.addEdge(from, to).also { edge ->
