@@ -9,7 +9,10 @@ import org.jgrapht.graph.SimpleWeightedGraph
 import org.objectweb.asm.Opcodes.*
 import org.objectweb.asm.tree.AbstractInsnNode
 import org.objectweb.asm.tree.ClassNode
+import org.objectweb.asm.tree.LineNumberNode
 import org.objectweb.asm.tree.MethodNode
+import kotlin.math.max
+import kotlin.math.min
 
 object StaticMethodClassifier : AbstractClassifier<MethodNode>() {
 
@@ -25,6 +28,7 @@ object StaticMethodClassifier : AbstractClassifier<MethodNode>() {
         addClassifier(outRefs, 6)
         addClassifier(fieldReadRefs, 5)
         addClassifier(fieldWriteRefs, 5)
+        addClassifier(lineNumberRange, 8)
         //addClassifier(code, 12)
     }
 
@@ -76,6 +80,29 @@ object StaticMethodClassifier : AbstractClassifier<MethodNode>() {
 
     private val fieldWriteRefs = classifier { a, b ->
         return@classifier ClassifierUtil.compareFieldSets(a.fieldWriteRefs, b.fieldWriteRefs)
+    }
+
+    private val lineNumberRange = classifier { a, b ->
+        val lineRangeA = a.getLineNumberRange()
+        val lineRangeB = b.getLineNumberRange()
+        return@classifier ClassifierUtil.compareSets(lineRangeA.toSet(), lineRangeB.toSet())
+    }
+
+    private fun MethodNode.getLineNumberRange(): IntRange {
+        var min = -1
+        var max = -1
+        instructions.forEach { insn ->
+            if(insn is LineNumberNode) {
+                val line = insn.line
+                if(min == -1 || line < min) {
+                    min = line
+                }
+                if(max == -1 || line > max) {
+                    max = line
+                }
+            }
+        }
+        return min..max
     }
 
     private val code = classifier { a, b ->

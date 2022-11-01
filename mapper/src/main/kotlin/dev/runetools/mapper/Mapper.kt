@@ -3,10 +3,9 @@ package dev.runetools.mapper
 import dev.runetools.asm.tree.*
 import dev.runetools.mapper.asm.hasMatch
 import dev.runetools.mapper.asm.match
+import dev.runetools.mapper.classifier.ClassClassifier
 import dev.runetools.mapper.classifier.ClassifierUtil
-import dev.runetools.mapper.classifier.ClassifierUtil.isMaybeEqual
 import dev.runetools.mapper.classifier.StaticMethodClassifier
-import org.objectweb.asm.tree.ClassNode
 import org.tinylog.kotlin.Logger
 import java.io.File
 import java.io.FileNotFoundException
@@ -65,6 +64,7 @@ object Mapper {
         /*
          * Initialize classifiers.
          */
+        ClassClassifier.init()
         StaticMethodClassifier.init()
     }
 
@@ -73,12 +73,38 @@ object Mapper {
 
         autoMatchAll()
 
-        val methodMatches = fromPool.classes.flatMap { it.methods }.filter { it.hasMatch() }.associate { it.id to it.match!!.id }
+        val staticMethodMatches = fromPool.classes.flatMap { it.methods }.filter { it.hasMatch() }.associate { it.id to it.match!!.id }
+        val classMatches = fromPool.classes.filter { it.hasMatch() }.associate { it.id to it.match!!.id }
         println()
     }
 
     private fun autoMatchAll() {
-        while(autoMatchStaticMethods()) {}
+        var matchedAny: Boolean
+        do {
+            matchedAny = autoMatchStaticMethods()
+            matchedAny = matchedAny or autoMatchClasses()
+        } while(matchedAny)
+    }
+
+    private fun autoMatchClasses(): Boolean {
+        Logger.info("Matching classes.")
+
+        val fromSet = fromPool.classes.filter { !it.hasMatch() }.toSet()
+        val toSet = toPool.classes.filter { !it.hasMatch() }.toSet()
+
+        val matches = ClassClassifier.rank(fromSet, toSet, ClassifierUtil::isMaybeEqual)
+        var matched = 0
+
+        matches.forEach { match ->
+            if(match.from.match != match.to) {
+                match.from.match(match.to)
+                matched++
+            }
+        }
+
+        Logger.info("Matched $matched classes.")
+
+        return matched > 0
     }
 
     private fun autoMatchStaticMethods(): Boolean {
@@ -93,18 +119,16 @@ object Mapper {
             .toSet()
 
         val matches = StaticMethodClassifier.rank(fromSet, toSet, ClassifierUtil::isMaybeEqual)
-        var changed = 0
+        var matched = 0
         matches.forEach { match ->
             if(match.from.match != match.to) {
                 match.from.match(match.to)
-                changed++
-            } else {
-                println("duplicate match")
+                matched++
             }
         }
 
-        Logger.info("Matched $changed static methods.")
-        return changed > 0
+        Logger.info("Matched $matched static methods.")
+        return matched > 0
     }
 
     private fun save() {
