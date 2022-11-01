@@ -1,25 +1,23 @@
 package dev.runetools.mapper.classifier
 
+import dev.runetools.asm.util.ConsoleProgressBar
 import dev.runetools.asm.util.linkedListOf
-import java.util.LinkedList
+import dev.runetools.mapper.mapping.Mapping
+import dev.runetools.mapper.mapping.NodeMappings
 
 abstract class AbstractClassifier<T> {
 
-    val classifiers = hashMapOf<ClassifierLevel, LinkedList<Classifier<T>>>()
-    val maxScore = hashMapOf<ClassifierLevel, Double>()
+    val classifiers = linkedListOf<Classifier<T>>()
 
     abstract fun init()
 
-    fun addClassifier(classifier: Classifier<T>, weight: Int, vararg levels: ClassifierLevel = arrayOf(ClassifierLevel.INITIAL)) {
+    fun addClassifier(classifier: Classifier<T>, weight: Int) {
         classifier.weight = weight.toDouble()
-        levels.forEach { level ->
-            classifiers.computeIfAbsent(level) { linkedListOf() }.add(classifier)
-        }
+        classifiers.add(classifier)
     }
 
     fun classifier(block: (a: T, b: T) -> Double): Classifier<T> {
         return object : Classifier<T> {
-            override var level = ClassifierLevel.INITIAL
             override var weight = 1.0
             override fun calculateScore(a: T, b: T): Double {
                 return block(a, b)
@@ -27,5 +25,27 @@ abstract class AbstractClassifier<T> {
         }
     }
 
-    abstract fun rank(level: ClassifierLevel, fromSet: Set<T>, toSet: Set<T>, filter: (from: T, to: T) -> Boolean): List<MatchResult<T>>
+    fun rank(from: T, toSet: Set<T>): Mapping? {
+        var highest: Mapping? = null
+        var multiple = false
+
+        toSet.forEach { to ->
+            val mapping = Mapping(from as Any, to as Any)
+            var weight = 0.0
+            classifiers.forEach { classifier ->
+                weight += (classifier.calculateScore(from, to) * classifier.weight)
+            }
+            mapping.weight= (weight * 100.0).toInt()
+
+            if(highest == null || mapping.weight > highest!!.weight) {
+                highest = mapping
+                multiple = false
+            } else if(mapping.weight == highest!!.weight) {
+                multiple = true
+            }
+        }
+
+        if(multiple) return null
+        return highest
+    }
 }

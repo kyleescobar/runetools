@@ -1,12 +1,10 @@
 package dev.runetools.mapper
 
 import dev.runetools.asm.tree.*
-import dev.runetools.mapper.asm.hasMatch
-import dev.runetools.mapper.asm.match
-import dev.runetools.mapper.classifier.ClassClassifier
-import dev.runetools.mapper.classifier.ClassifierLevel
-import dev.runetools.mapper.classifier.ClassifierUtil
-import dev.runetools.mapper.classifier.StaticMethodClassifier
+import dev.runetools.mapper.classifier.*
+import dev.runetools.mapper.mapping.NodeMappings
+import dev.runetools.mapper.mapping.StaticMethodMapper
+import org.objectweb.asm.tree.MethodNode
 import org.tinylog.kotlin.Logger
 import java.io.File
 import java.io.FileNotFoundException
@@ -68,70 +66,22 @@ object Mapper {
          */
         ClassClassifier.init()
         StaticMethodClassifier.init()
+        MethodClassifier.init()
     }
 
     private fun run() {
         Logger.info("Starting mapper.")
 
-        autoMatchAll(ClassifierLevel.INITIAL)
-        autoMatchAll(ClassifierLevel.SECONDARY)
+        val nodeMappings = NodeMappings()
 
-        val staticMethodMatches = fromPool.classes.flatMap { it.methods }.filter { it.hasMatch() }.associate { it.id to it.match!!.id }
-        val classMatches = fromPool.classes.filter { it.hasMatch() }.associate { it.id to it.match!!.id }
+        /*
+         * Map static methods.
+         */
+        StaticMethodMapper().map(fromPool, toPool).also { nodeMappings.merge(it) }
+        nodeMappings.reduce()
+
+        val results = nodeMappings.asMap().map { "FROM: ${(it.key as MethodNode).id}, TO: ${(it.value as MethodNode).id}" }
         println()
-    }
-
-    private fun autoMatchAll(level: ClassifierLevel) {
-        Logger.info("Matching level: ${level.name}.")
-
-        var matchedAny: Boolean
-        do {
-            matchedAny = autoMatchStaticMethods(level)
-            matchedAny = matchedAny or autoMatchClasses(level)
-        } while(matchedAny)
-    }
-
-    private fun autoMatchClasses(level: ClassifierLevel): Boolean {
-        Logger.info("Matching classes.")
-
-        val fromSet = fromPool.classes.filter { !it.hasMatch() }.toSet()
-        val toSet = toPool.classes.filter { !it.hasMatch() }.toSet()
-
-        val matches = ClassClassifier.rank(level, fromSet, toSet, ClassifierUtil::isMaybeEqual)
-        var matched = 0
-
-        matches.forEach { match ->
-            if(match.from.match != match.to) {
-                match.from.match(match.to)
-                matched++
-            }
-        }
-
-        Logger.info("Matched $matched classes.")
-
-        return matched > 0
-    }
-
-    private fun autoMatchStaticMethods(level: ClassifierLevel): Boolean {
-        Logger.info("Matching static methods.")
-
-        val fromSet = fromPool.classes.flatMap { it.methods }
-            .filter { it.isStatic() && !it.hasMatch() }
-            .toSet()
-
-        val toSet = toPool.classes.flatMap { it.methods }
-            .filter { it.isStatic() && !it.hasMatch() }
-            .toSet()
-
-        val matches = StaticMethodClassifier.rank(level, fromSet, toSet, ClassifierUtil::isMaybeEqual)
-        var matched = 0
-        matches.forEach { match ->
-            match.from.match(match.to)
-            matched++
-        }
-
-        Logger.info("Matched $matched static methods.")
-        return matched > 0
     }
 
     private fun save() {

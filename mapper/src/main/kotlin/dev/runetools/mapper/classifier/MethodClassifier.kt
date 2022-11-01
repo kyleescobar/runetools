@@ -1,28 +1,21 @@
 package dev.runetools.mapper.classifier
 
 import dev.runetools.asm.tree.*
-import dev.runetools.asm.util.ConsoleProgressBar
-import dev.runetools.mapper.asm.match
-import org.jgrapht.alg.matching.KuhnMunkresMinimalWeightBipartitePerfectMatching
-import org.jgrapht.alg.matching.MaximumWeightBipartiteMatching
-import org.jgrapht.graph.DefaultWeightedEdge
-import org.jgrapht.graph.SimpleWeightedGraph
-import org.objectweb.asm.Opcodes.*
+import org.objectweb.asm.Opcodes
 import org.objectweb.asm.tree.AbstractInsnNode
-import org.objectweb.asm.tree.ClassNode
 import org.objectweb.asm.tree.LineNumberNode
 import org.objectweb.asm.tree.MethodNode
-import kotlin.concurrent.thread
-import kotlin.math.max
-import kotlin.math.min
 
-object StaticMethodClassifier : AbstractClassifier<MethodNode>() {
+object MethodClassifier : AbstractClassifier<MethodNode>() {
+
 
     override fun init() {
         addClassifier(methodTypeCheck, 10)
         addClassifier(accessFlags, 4)
         addClassifier(argTypes, 10)
         addClassifier(returnType, 5)
+        addClassifier(owner, 8)
+        addClassifier(hierarchy, 6)
         addClassifier(strings, 5)
         addClassifier(numbers, 5)
         addClassifier(classRefs, 3)
@@ -30,30 +23,44 @@ object StaticMethodClassifier : AbstractClassifier<MethodNode>() {
         addClassifier(outRefs, 6)
         addClassifier(fieldReadRefs, 5)
         addClassifier(fieldWriteRefs, 5)
-        addClassifier(lineNumberRange, 8)
+        addClassifier(lineNumberRange, 3)
         //addClassifier(code, 12)
     }
 
     private val methodTypeCheck = classifier { a, b ->
-        val mask = ACC_STATIC or ACC_NATIVE or ACC_ABSTRACT
+        val mask = Opcodes.ACC_STATIC or Opcodes.ACC_NATIVE or Opcodes.ACC_ABSTRACT
         val resultA = a.access and mask
         val resultB = b.access and mask
         return@classifier 1 - Integer.bitCount(resultA xor resultB) / 3.0
     }
 
     private val accessFlags = classifier { a, b ->
-        val mask = (ACC_PUBLIC or ACC_PROTECTED or ACC_PRIVATE) or ACC_FINAL or ACC_SYNCHRONIZED or ACC_BRIDGE or ACC_VARARGS or ACC_STRICT or ACC_SYNTHETIC or ACC_STATIC
+        val mask =
+            (Opcodes.ACC_PUBLIC or Opcodes.ACC_PROTECTED or Opcodes.ACC_PRIVATE) or Opcodes.ACC_FINAL or Opcodes.ACC_SYNCHRONIZED or Opcodes.ACC_BRIDGE or Opcodes.ACC_VARARGS or Opcodes.ACC_STRICT or Opcodes.ACC_SYNTHETIC
         val resultA = a.access and mask
         val resultB = b.access and mask
-        return@classifier 1 - Integer.bitCount(resultA xor resultB) / 9.0
+        return@classifier 1 - Integer.bitCount(resultA xor resultB) / 8.0
     }
 
     private val argTypes = classifier { a, b ->
-        return@classifier ClassifierUtil.compareNodeSets(a.type.argumentTypes.toSet(), b.type.argumentTypes.toSet(), { null }, ClassifierUtil::isMaybeEqual)
+        return@classifier ClassifierUtil.compareNodeSets(
+            a.type.argumentTypes.toSet(),
+            b.type.argumentTypes.toSet(),
+            { null },
+            ClassifierUtil::isMaybeEqual
+        )
     }
 
     private val returnType = classifier { a, b ->
-        return@classifier if(ClassifierUtil.isMaybeEqual(a.type.returnType, b.type.returnType)) 1.0 else 0.0
+        return@classifier if (ClassifierUtil.isMaybeEqual(a.type.returnType, b.type.returnType)) 1.0 else 0.0
+    }
+    
+    private val owner = classifier { a, b -> 
+        return@classifier if(ClassifierUtil.isMaybeEqual(a.owner, b.owner)) 1.0 else 0.0
+    }
+    
+    private val hierarchy = classifier { a, b -> 
+        return@classifier ClassifierUtil.compareMethodSets(a.hierarchy, b.hierarchy)
     }
 
     private val strings = classifier { a, b ->

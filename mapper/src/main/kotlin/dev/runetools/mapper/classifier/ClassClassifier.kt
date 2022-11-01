@@ -2,11 +2,6 @@ package dev.runetools.mapper.classifier
 
 import dev.runetools.asm.tree.*
 import dev.runetools.mapper.classifier.ClassifierUtil.isObfuscatedName
-import org.jgrapht.alg.matching.DenseEdmondsMaximumCardinalityMatching
-import org.jgrapht.alg.matching.GreedyWeightedMatching
-import org.jgrapht.alg.matching.MaximumWeightBipartiteMatching
-import org.jgrapht.graph.DefaultWeightedEdge
-import org.jgrapht.graph.SimpleWeightedGraph
 import org.objectweb.asm.Opcodes.*
 import org.objectweb.asm.Type
 import org.objectweb.asm.tree.ClassNode
@@ -209,49 +204,5 @@ object ClassClassifier : AbstractClassifier<ClassNode>() {
             return@classifier if(a.name == b.name) 1.0 else 0.0
         }
         return@classifier 0.0
-    }
-
-    override fun rank(
-        level: ClassifierLevel,
-        fromSet: Set<ClassNode>,
-        toSet: Set<ClassNode>,
-        filter: (from: ClassNode, to: ClassNode) -> Boolean
-    ): List<MatchResult<ClassNode>> {
-        val fromNodes = hashSetOf<ClassNode>()
-        val toNodes = hashSetOf<ClassNode>()
-
-        fromSet.forEach { from ->
-            toSet.forEach { to ->
-                if(filter(from, to)) {
-                    if(from !in fromNodes) fromNodes.add(from)
-                    if(to !in toNodes) toNodes.add(to)
-                }
-            }
-        }
-
-        val graph = SimpleWeightedGraph<ClassNode, DefaultWeightedEdge>(DefaultWeightedEdge::class.java)
-        fromNodes.forEach { graph.addVertex(it) }
-        toNodes.forEach { graph.addVertex(it) }
-
-        fromNodes.forEach { from ->
-            toNodes.forEach { to ->
-                var score = 0.0
-                classifiers[level]!!.forEach { classifier ->
-                    score += (classifier.calculateScore(from, to) * classifier.weight)
-                }
-
-                graph.addEdge(from, to).also {
-                    graph.setEdgeWeight(it, score)
-                }
-            }
-        }
-
-        val matching = MaximumWeightBipartiteMatching(graph, fromNodes, toNodes).matching
-        return matching.edges.mapNotNull { edge ->
-            val from = graph.getEdgeSource(edge)
-            val to = graph.getEdgeTarget(edge)
-            val weight = graph.getEdgeWeight(edge)
-            return@mapNotNull MatchResult<ClassNode>(from, to, weight)
-        }
     }
 }

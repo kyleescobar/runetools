@@ -7,4 +7,5 @@ dependencies {
     api(Libs.asm_commons)
     api(Libs.asm_util)
     api(Libs.asm_tree)
+    implementation("me.tongfei:progressbar:_")
 }
