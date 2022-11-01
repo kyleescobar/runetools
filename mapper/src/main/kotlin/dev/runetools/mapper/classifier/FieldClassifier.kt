@@ -13,7 +13,6 @@ object FieldClassifier : AbstractClassifier<FieldNode>() {
         addClassifier(type, 10)
         addClassifier(readRefs, 6)
         addClassifier(writeRefs, 6)
-        //addClassifier(initializerIndex, 8)
         addClassifier(initValue, 7)
     }
 
@@ -41,12 +40,6 @@ object FieldClassifier : AbstractClassifier<FieldNode>() {
 
     private val writeRefs = classifier { a, b ->
         return@classifier ClassifierUtil.compareMethodSets(a.writeRefs, b.writeRefs)
-    }
-
-    private val initializerIndex = classifier { a, b ->
-        val fieldIndexsA = a.pool.fieldInitializedOrder()
-        val fieldIndexsB = b.pool.fieldInitializedOrder()
-        return@classifier ClassifierUtil.compareCounts(fieldIndexsA.indexOf(a), fieldIndexsB.indexOf(b))
     }
 
     private fun ClassPool.fieldInitializedOrder(): Set<FieldNode> {

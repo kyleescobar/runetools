@@ -1,4 +1,4 @@
-package dev.runetools.mapper.mapping
+package dev.runetools.mapper
 
 import com.google.common.collect.LinkedHashMultimap
 import dev.runetools.asm.tree.ClassPool

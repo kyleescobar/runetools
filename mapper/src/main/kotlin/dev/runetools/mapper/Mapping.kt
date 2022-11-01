@@ -1,7 +1,6 @@
-package dev.runetools.mapper.mapping
+package dev.runetools.mapper
 
 import java.lang.Integer.max
-import java.lang.Integer.valueOf
 
 class Mapping(val from: Any, val to: Any) {
 

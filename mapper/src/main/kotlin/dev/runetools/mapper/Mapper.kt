@@ -2,7 +2,7 @@ package dev.runetools.mapper
 
 import dev.runetools.asm.tree.*
 import dev.runetools.mapper.classifier.*
-import dev.runetools.mapper.mapping.*
+import dev.runetools.mapper.mapping.MappingWriter
 import org.objectweb.asm.tree.ClassNode
 import org.objectweb.asm.tree.FieldNode
 import org.objectweb.asm.tree.LocalVariableNode
@@ -11,8 +11,7 @@ import org.tinylog.kotlin.Logger
 import java.io.File
 import java.io.FileNotFoundException
 import java.lang.Integer.max
-import kotlin.math.round
-import kotlin.math.sqrt
+import kotlin.math.min
 
 object Mapper {
 
@@ -79,44 +78,26 @@ object Mapper {
 
         val nodeMappings = NodeMappings()
 
-        /*
-         * Map static methods.
-         */
         StaticMethodMapper().map(fromPool, toPool).also { nodeMappings.merge(it) }
-
-        /*
-         * Map member methods.
-         */
         MemberMethodMapper().map(fromPool, toPool).also { nodeMappings.merge(it) }
-
-        /*
-         * Reduce matches.
-         */
         nodeMappings.reduce()
 
-        /*
-         * Map classes
-         */
         ClassMapper().map(fromPool, toPool).also { nodeMappings.merge(it) }
-
-        /*
-         * Map fields
-         */
         FieldMapper().map(fromPool, toPool).also { nodeMappings.merge(it) }
+        nodeMappings.reduce()
 
-        /*
-         * Reduce matches.
-         */
+        MethodRefMapper().map(nodeMappings)
+        ClassRefMapper().map(nodeMappings)
         nodeMappings.reduce()
 
         val totalClasses = max(fromPool.classes.size, toPool.classes.size)
         val totalMethods = max(fromPool.classes.flatMap { it.methods }.size, toPool.classes.flatMap { it.methods }.size)
         val totalFields = max(fromPool.classes.flatMap { it.fields }.size, toPool.classes.flatMap { it.fields }.size)
         val totalLocalVars = max(fromPool.classes.flatMap { it.methods.flatMap { it.localVariables ?: emptyList() } }.size, toPool.classes.flatMap { it.methods.flatMap { it.localVariables ?: emptyList() } }.size)
-        val matchedClasses = nodeMappings.asMap().filterKeys { it is ClassNode }.size
-        val matchedMethods = nodeMappings.asMap().filterKeys { it is MethodNode }.size
-        val matchedFields = nodeMappings.asMap().filterKeys { it is FieldNode }.size
-        val matchedLocalVars = nodeMappings.asMap().filterKeys { it is LocalVariableNode }.size
+        val matchedClasses = min(nodeMappings.asMap().filterKeys { it is ClassNode }.size, nodeMappings.asMap().filterValues { it is ClassNode }.size)
+        val matchedMethods = min(nodeMappings.asMap().filterKeys { it is MethodNode }.size, nodeMappings.asMap().filterValues { it is MethodNode }.size)
+        val matchedFields = min(nodeMappings.asMap().filterKeys { it is FieldNode }.size, nodeMappings.asMap().filterValues { it is FieldNode }.size)
+        val matchedLocalVars = min(nodeMappings.asMap().filterKeys { it is LocalVariableNode }.size, nodeMappings.asMap().filterValues { it is LocalVariableNode }.size)
 
         val percentClasses = (matchedClasses.toDouble() / totalClasses.toDouble()) * 100.0
         val percentMethods = (matchedMethods.toDouble() / totalMethods.toDouble()) * 100.0
@@ -130,7 +111,7 @@ object Mapper {
         Logger.info("Mapped Fields: $matchedFields / $totalFields ($percentFields%)")
         Logger.info("Mapped Locals: $matchedLocalVars / $totalLocalVars ($percentLocalVars%)")
 
-        println()
+        MappingWriter(nodeMappings.asMap(), toPool).writeToDirectory(File("rev209_mappings/"))
     }
 
     private fun save() {

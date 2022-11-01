@@ -2,8 +2,7 @@ package dev.runetools.mapper.classifier
 
 import dev.runetools.asm.util.ConsoleProgressBar
 import dev.runetools.asm.util.linkedListOf
-import dev.runetools.mapper.mapping.Mapping
-import dev.runetools.mapper.mapping.NodeMappings
+import dev.runetools.mapper.Mapping
 
 abstract class AbstractClassifier<T> {
 
