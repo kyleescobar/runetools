@@ -2,12 +2,19 @@ package dev.runetools.mapper
 
 import dev.runetools.asm.tree.*
 import dev.runetools.mapper.classifier.*
+import dev.runetools.mapper.mapping.ClassMapper
+import dev.runetools.mapper.mapping.MemberMethodMapper
 import dev.runetools.mapper.mapping.NodeMappings
 import dev.runetools.mapper.mapping.StaticMethodMapper
+import org.objectweb.asm.tree.ClassNode
+import org.objectweb.asm.tree.FieldNode
+import org.objectweb.asm.tree.LocalVariableNode
 import org.objectweb.asm.tree.MethodNode
 import org.tinylog.kotlin.Logger
 import java.io.File
 import java.io.FileNotFoundException
+import java.lang.Integer.max
+import kotlin.math.round
 import kotlin.math.sqrt
 
 object Mapper {
@@ -78,9 +85,43 @@ object Mapper {
          * Map static methods.
          */
         StaticMethodMapper().map(fromPool, toPool).also { nodeMappings.merge(it) }
+
+        /*
+         * Map member methods.
+         */
+        MemberMethodMapper().map(fromPool, toPool).also { nodeMappings.merge(it) }
+
+        /*
+         * Reduce matches.
+         */
         nodeMappings.reduce()
 
-        val results = nodeMappings.asMap().map { "FROM: ${(it.key as MethodNode).id}, TO: ${(it.value as MethodNode).id}" }
+        /*
+         * Map classes
+         */
+        ClassMapper().map(fromPool, toPool).also { nodeMappings.merge(it) }
+
+        val totalClasses = max(fromPool.classes.size, toPool.classes.size)
+        val totalMethods = max(fromPool.classes.flatMap { it.methods }.size, toPool.classes.flatMap { it.methods }.size)
+        val totalFields = max(fromPool.classes.flatMap { it.fields }.size, toPool.classes.flatMap { it.fields }.size)
+        val totalLocalVars = max(fromPool.classes.flatMap { it.methods.flatMap { it.localVariables } }.size, toPool.classes.flatMap { it.methods.flatMap { it.localVariables } }.size)
+        val matchedClasses = nodeMappings.asMap().filterKeys { it is ClassNode }.size
+        val matchedMethods = nodeMappings.asMap().filterKeys { it is MethodNode }.size
+        val matchedFields = nodeMappings.asMap().filterKeys { it is FieldNode }.size
+        val matchedLocalVars = nodeMappings.asMap().filterKeys { it is LocalVariableNode }.size
+
+        val percentClasses = round(matchedClasses.toDouble() / totalClasses.toDouble()) * 100.0
+        val percentMethods = round(matchedMethods.toDouble() / totalMethods.toDouble()) * 100.0
+        val percentFields = round(matchedFields.toDouble() / totalFields.toDouble()) * 100.0
+        val percentLocalVars = round(matchedLocalVars.toDouble() / totalLocalVars.toDouble()) * 100.0
+
+        Logger.info("Successfully completed mapping. Below are the results.")
+        Logger.info("=======================================================")
+        Logger.info("Mapped Classes: $matchedClasses / $totalClasses ($percentClasses%)")
+        Logger.info("Mapped Methods: $matchedMethods / $totalMethods ($percentMethods%)")
+        Logger.info("Mapped Fields: $matchedFields / $totalFields ($percentFields%)")
+        Logger.info("Mapped Locals: $matchedLocalVars / $totalLocalVars ($percentLocalVars%)")
+
         println()
     }
 

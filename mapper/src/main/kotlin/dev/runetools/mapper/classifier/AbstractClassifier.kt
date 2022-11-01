@@ -29,7 +29,7 @@ abstract class AbstractClassifier<T> {
         var highest: Mapping? = null
         var multiple = false
 
-        toSet.forEach { to ->
+        toSet.parallelStream().forEach { to ->
             val mapping = Mapping(from as Any, to as Any)
             var weight = 0.0
             classifiers.forEach { classifier ->
