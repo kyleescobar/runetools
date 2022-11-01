@@ -18,17 +18,18 @@ object Mapper {
     private lateinit var fromJar: File
     private lateinit var toJar: File
     private lateinit var outputJar: File
+    private lateinit var outputDir: File
 
     private val fromPool = ClassPool()
     private val toPool = ClassPool()
 
     @JvmStatic
     fun main(args: Array<String>) {
-        if(args.size != 3) throw IllegalArgumentException("Usage: mapper.jar <old-jar> <new-jar> <output-jar>")
+        if(args.size != 3) throw IllegalArgumentException("Usage: mapper.jar <old-jar> <new-jar> <output-dir>")
 
         fromJar = File(args[0])
         toJar = File(args[1])
-        outputJar = File(args[2])
+        outputDir = File(args[2])
 
         if(!fromJar.exists() || !toJar.exists()) {
             throw FileNotFoundException()
@@ -111,7 +112,7 @@ object Mapper {
         Logger.info("Mapped Fields: $matchedFields / $totalFields ($percentFields%)")
         Logger.info("Mapped Locals: $matchedLocalVars / $totalLocalVars ($percentLocalVars%)")
 
-        MappingWriter(nodeMappings.asMap(), toPool).writeToDirectory(File("rev209_mappings/"))
+        MappingWriter(nodeMappings.asMap(), toPool).writeToDirectory(outputDir)
     }
 
     private fun save() {
