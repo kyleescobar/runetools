@@ -1,15 +1,14 @@
 package dev.runetools.asm.tree
 
 import dev.runetools.asm.util.field
-import dev.runetools.asm.util.linkedListOf
-import dev.runetools.asm.util.listField
+import dev.runetools.asm.util.hashSetField
 import dev.runetools.asm.util.nullField
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassWriter
+import org.objectweb.asm.Type
 import org.objectweb.asm.tree.ClassNode
 import org.objectweb.asm.tree.FieldNode
 import org.objectweb.asm.tree.MethodNode
-import java.util.LinkedList
 
 internal fun ClassNode.init(pool: ClassPool) {
     this.pool = pool
@@ -21,17 +20,18 @@ var ClassNode.pool: ClassPool by field()
 var ClassNode.ignored: Boolean by field { false }
 
 val ClassNode.id: String get() = name
+val ClassNode.type get() = Type.getObjectType(name)
 
 var ClassNode.parent: ClassNode? by nullField()
-val ClassNode.children: LinkedList<ClassNode> by listField()
-val ClassNode.interfaceClasses: LinkedList<ClassNode> by listField()
-val ClassNode.implementers: LinkedList<ClassNode> by listField()
+val ClassNode.children: HashSet<ClassNode> by hashSetField()
+val ClassNode.interfaceClasses: HashSet<ClassNode> by hashSetField()
+val ClassNode.implementers: HashSet<ClassNode> by hashSetField()
 
-val ClassNode.methodTypeRefs: LinkedList<MethodNode> by listField()
-val ClassNode.fieldTypeRefs: LinkedList<FieldNode> by listField()
+val ClassNode.methodTypeRefs: HashSet<MethodNode> by hashSetField()
+val ClassNode.fieldTypeRefs: HashSet<FieldNode> by hashSetField()
 
-val ClassNode.strings: LinkedList<String> get() {
-    val results = linkedListOf<String>()
+val ClassNode.strings: HashSet<String> get() {
+    val results = hashSetOf<String>()
     fields.forEach { field ->
         if(field.value != null && field.value is String) results.add(field.value as String)
     }
@@ -79,7 +79,7 @@ fun ClassNode.resolveField(name: String, desc: String): FieldNode? {
 
 fun ClassNode.accept(data: ByteArray) {
     val reader = ClassReader(data)
-    reader.accept(this, ClassReader.EXPAND_FRAMES)
+    reader.accept(this, ClassReader.SKIP_FRAMES)
 }
 
 fun ClassNode.toByteArray(): ByteArray {

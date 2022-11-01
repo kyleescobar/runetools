@@ -9,3 +9,5 @@ refreshVersions {
 rootProject.name = "runetools"
 
 include(":asm")
+include(":mapper")
+include(":deobfuscator")

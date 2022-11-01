@@ -1,7 +1,7 @@
 package dev.runetools.asm.tree
 
 import dev.runetools.asm.util.field
-import dev.runetools.asm.util.listField
+import dev.runetools.asm.util.hashSetField
 import org.objectweb.asm.Opcodes.*
 import org.objectweb.asm.Type
 import org.objectweb.asm.tree.*
@@ -17,17 +17,17 @@ internal fun MethodNode.init(owner: ClassNode) {
 var MethodNode.owner: ClassNode by field()
 val MethodNode.pool: ClassPool get() = owner.pool
 
-val MethodNode.args: LinkedList<LocalVariable> by listField()
-val MethodNode.vars: LinkedList<LocalVariable> by listField()
+val MethodNode.args: HashSet<LocalVariable> by hashSetField()
+val MethodNode.vars: HashSet<LocalVariable> by hashSetField()
 
 var MethodNode.index: Int by field { -1 }
-val MethodNode.strings: LinkedList<String> by listField()
-val MethodNode.numbers: LinkedList<Number> by listField()
-val MethodNode.refsIn: LinkedList<MethodNode> by listField()
-val MethodNode.refsOut: LinkedList<MethodNode> by listField()
-val MethodNode.fieldWriteRefs: LinkedList<FieldNode> by listField()
-val MethodNode.fieldReadRefs: LinkedList<FieldNode> by listField()
-val MethodNode.classRefs: LinkedList<ClassNode> by listField()
+val MethodNode.strings: HashSet<String> by hashSetField()
+val MethodNode.numbers: HashSet<Number> by hashSetField()
+val MethodNode.refsIn: HashSet<MethodNode> by hashSetField()
+val MethodNode.refsOut: HashSet<MethodNode> by hashSetField()
+val MethodNode.fieldWriteRefs: HashSet<FieldNode> by hashSetField()
+val MethodNode.fieldReadRefs: HashSet<FieldNode> by hashSetField()
+val MethodNode.classRefs: HashSet<ClassNode> by hashSetField()
 
 val MethodNode.id: String get() = "${owner.id}.$name$desc"
 val MethodNode.type get() = Type.getMethodType(desc)
